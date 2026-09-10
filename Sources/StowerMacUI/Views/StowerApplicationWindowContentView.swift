@@ -3,7 +3,7 @@
 import AppKit
 import SwiftUI
 
-/// The app's whole composition API: a public, no-argument root view.
+/// The app's whole composition API: a public, no-argument Application Window content view.
 ///
 /// `init()` builds the shared `StowerMessagesComposition` — ONE
 /// `StowerDebtBoardProvider` injected into both the startup adapter and the board
@@ -13,18 +13,22 @@ import SwiftUI
 /// `StowerMessages`. It switches on the startup state, cross-fading between
 /// screens, hands off to the board at `.connectedPreparingBoard`, and reruns the
 /// flow on Check Again.
-public struct StowerRootView: View {
-    @State internal var model: StowerStartupModel
-    @State private var boardModel: StowerBoardViewModel
+public struct StowerApplicationWindowContentView: View {
+    @State internal var startupModel: StowerStartupModel
+
+    /// `internal` (not `private`) so the drain tests can put a write in flight
+    /// through the content view (I-DrainOutlivesWindow) — the same widening
+    /// precedent as `startupModel` above.
+    @State internal var boardModel: StowerBoardViewModel
 
     /// The feedback sheet's model.
     ///
-    /// Constructed once here and injected into the board so an in-progress
+    /// Retained as `@State` here and injected into the board so an in-progress
     /// message survives a re-render (JC2). Reads live trial state at send time
     /// via the startup model.
     @State private var feedbackModel: StowerFeedbackModel
 
-    /// The typed text in the key-entry screen; a `@State` on the stable root so
+    /// The typed text in the key-entry screen; a `@State` on this stable view so
     /// it survives an in-flight activate and any error re-render.
     @State internal var licenseKey = ""
 
@@ -34,8 +38,9 @@ public struct StowerRootView: View {
     /// banner dismissal, so the gear-menu Buy/Enter-key path persists.
     ///
     /// `internal` (not `private`) — along with the other licensing/trial/banner
-    /// `@State` below — so `StowerRootViewLicensing.swift`'s extension methods
-    /// can read/write them; a stored property can't live in an extension.
+    /// `@State` below — so `StowerApplicationWindowContentViewLicensing.swift`'s
+    /// extension methods can read/write them; a stored property can't live in an
+    /// extension.
     @State internal var trialBadge: StowerTrialBadge?
 
     /// Whether the user has dismissed the (pre-F3) trial banner this session.
@@ -87,7 +92,8 @@ public struct StowerRootView: View {
     ///
     /// A single instance covers both surfaces so they never desync (the UserDefaults
     /// record is the underlying source of truth — shared across all readers). `internal` so
-    /// `StowerRootViewLicensing.swift`'s `scheduleConsentCardIfNeeded()` can read it.
+    /// `StowerApplicationWindowContentViewLicensing.swift`'s
+    /// `scheduleConsentCardIfNeeded()` can read it.
     internal let consent = StowerDiagnosticsConsent()
 
     internal let settings: StowerSystemSettingsOpener
@@ -106,21 +112,22 @@ public struct StowerRootView: View {
     /// `UserDefaults.standard`; tests inject a fake.
     internal let badgeDismissal: any StowerTrialBadgeDismissing
 
-    /// Builds the production root wired to the shared engine-backed composition and
-    /// the real Lemon-Squeezy-backed license gate.
+    /// Builds the production `StowerApplicationWindowContentView` wired to the shared
+    /// engine-backed composition and the real Lemon-Squeezy-backed license gate.
     ///
     /// Throws only when an essential store can't be opened (a true disk-level draft
     /// store failure) — the same posture as any other essential-store startup fault.
     ///
     /// - Parameters:
-    ///   - flusher: Wired to the board's `flushAll()` so the app delegate can drain
-    ///     in-flight draft writes on quit. Optional so previews omit it.
+    ///   - terminationDrain: Wired to the board's `drainPendingWork()` so the app
+    ///     delegate can drain in-flight draft writes on quit. Optional so previews
+    ///     omit it.
     ///   - undoManager: The app-owned `UndoManager` (A4) the app target also binds ⌘Z
     ///     to; defaults to a fresh instance so previews/tests need not supply one.
     /// - Throws: When an essential store (the precious drafts database) can't be
     ///   opened on a true disk-level fault.
     public init(
-        flusher: StowerTerminationFlusher? = nil,
+        terminationDrain: StowerTerminationDrain? = nil,
         undoManager: UndoManager = UndoManager()
     ) throws {
         let composition = try StowerMessagesComposition()
@@ -138,7 +145,7 @@ public struct StowerRootView: View {
             settings: StowerSystemSettingsOpener(),
             badgeDismissal: StowerUserDefaultsBadgeDismissal(),
             messagesAccessBookmarkStore: composition.messagesAccessBookmarkStore,
-            flusher: flusher
+            terminationDrain: terminationDrain
         )
     }
 
@@ -147,8 +154,9 @@ public struct StowerRootView: View {
     /// Builds the shared composition internally. No license gating (MAS / previews).
     ///
     /// - Parameters:
-    ///   - flusher: Wired to the board's `flushAll()` so the app delegate can drain
-    ///     in-flight draft writes on quit. Optional so previews omit it.
+    ///   - terminationDrain: Wired to the board's `drainPendingWork()` so the app
+    ///     delegate can drain in-flight draft writes on quit. Optional so previews
+    ///     omit it.
     ///   - undoManager: The app-owned `UndoManager` (A4) the app target also binds ⌘Z
     ///     to; defaults to a fresh instance so previews/tests need not supply one.
     ///   - analyticsReporter: The analytics reporter to use (e.g. `StowerNoOpAnalyticsReporter()`
@@ -156,7 +164,7 @@ public struct StowerRootView: View {
     /// - Throws: When an essential store (the precious drafts database) can't be
     ///   opened on a true disk-level fault.
     public init(
-        flusher: StowerTerminationFlusher? = nil,
+        terminationDrain: StowerTerminationDrain? = nil,
         undoManager: UndoManager = UndoManager(),
         analyticsReporter: StowerNoOpAnalyticsReporter
     ) throws {
@@ -175,7 +183,7 @@ public struct StowerRootView: View {
             settings: StowerSystemSettingsOpener(),
             badgeDismissal: StowerUserDefaultsBadgeDismissal(),
             messagesAccessBookmarkStore: composition.messagesAccessBookmarkStore,
-            flusher: flusher
+            terminationDrain: terminationDrain
         )
     }
 
@@ -203,14 +211,14 @@ public struct StowerRootView: View {
         messagesAccessBookmarkStore: any StowerLeaseStorage = StowerUserDefaultsItem(
             key: StowerMessagesComposition.messagesAccessBookmarkKey
         ),
-        flusher: StowerTerminationFlusher? = nil
+        terminationDrain: StowerTerminationDrain? = nil
     ) {
         let startupModel = StowerStartupModel(
             provider: startup,
             licenseGate: licenseGate,
             reporter: analyticsReporter
         )
-        _model = State(initialValue: startupModel)
+        _startupModel = State(initialValue: startupModel)
         let boardModel = StowerBoardViewModel(
             dataSource: board,
             draftStore: draftStore,
@@ -234,7 +242,15 @@ public struct StowerRootView: View {
             analyticsReporter: analyticsReporter
         )
         _feedbackModel = State(initialValue: feedbackModel)
-        flusher?.onFlush { [weak boardModel] in await boardModel?.flushAll() }
+        // STRONG capture, deliberately (I-DrainOutlivesWindow): closing the
+        // Application Window tears down the view tree — and this @State-held model —
+        // BEFORE `applicationShouldTerminate` runs, so a weak capture would hollow
+        // the quit drain into a silent no-op and the process could exit mid-write.
+        // The terminationDrain lives on the app delegate (process lifetime), and the
+        // MAS app quits with its window, so the retain lasts only until that quit.
+        terminationDrain?.registerDrain { [boardModel] in
+            await boardModel.drainPendingWork()
+        }
         self.settings = settings
         self.badgeDismissal = badgeDismissal
         self.analyticsReporter = analyticsReporter
@@ -243,12 +259,12 @@ public struct StowerRootView: View {
 
     /// The startup screen for the current state, cross-fading on change.
     public var body: some View {
-        screen
+        currentScreen
             .frame(minWidth: Self.minWidth, minHeight: Self.minHeight)
-            .animation(.easeInOut(duration: Self.crossFade), value: model.state)
-            .task { model.start() }
-            .onDisappear { model.cancel() }
-            // F1 lives at the root, not inside the board case: a successful
+            .animation(.easeInOut(duration: Self.crossFade), value: startupModel.state)
+            .task { startupModel.start() }
+            .onDisappear { startupModel.cancel() }
+            // F1 attaches to this content view's body, not inside the board case: a successful
             // activation's startup rerun can stop short of the board (messages-
             // access onboarding, model unavailable), and the confirmation must
             // present over whichever screen the rerun lands on.
@@ -272,23 +288,24 @@ public struct StowerRootView: View {
             }
     }
 
-    @ViewBuilder private var screen: some View {
-        switch model.state {
+    @ViewBuilder private var currentScreen: some View {
+        switch startupModel.state {
         case .checkingModel, .checkingMessages:
-            StowerCheckingView(state: model.state)
+            StowerCheckingView(state: startupModel.state)
         case .needsLicense(let error):
             StowerLicenseEntryView(
                 key: $licenseKey,
                 error: error,
                 onActivate: { activate(key: $0) },
                 onBuy: { openCheckout() },
-                onBack: model.licenseEntryIsDismissible ? { model.dismissLicenseEntry() } : nil,
-                isActivating: model.isActivating
+                onBack: startupModel.licenseEntryIsDismissible
+                    ? { startupModel.dismissLicenseEntry() } : nil,
+                isActivating: startupModel.isActivating
             )
         case .modelUnavailable(let reason):
             StowerModelUnavailableView(
                 reason: reason,
-                onCheckAgain: { model.checkAgain() },
+                onCheckAgain: { startupModel.checkAgain() },
                 onOpenAppleIntelligence: { settings.openPane(.appleIntelligence) }
             )
         case .needsMessagesAccess:
@@ -320,7 +337,7 @@ public struct StowerRootView: View {
             }
             .animation(.easeInOut(duration: Self.crossFade), value: showConsentCard)
             .onAppear {
-                trialBadge = model.trialBadge()
+                trialBadge = startupModel.trialBadge()
                 trialBannerDismissed = badgeDismissal.isDismissed
                 scheduleConsentCardIfNeeded()
                 scheduleTrialExpiryRecheckIfNeeded()
@@ -342,15 +359,15 @@ public struct StowerRootView: View {
             // the user pastes the key and taps Activate (JC3).
             .onReceive(Self.didBecomeActive) { _ in
                 Task {
-                    await model.refreshLicenseIfOnBoard()
-                    trialBadge = model.trialBadge()
+                    await startupModel.refreshLicenseIfOnBoard()
+                    trialBadge = startupModel.trialBadge()
                     scheduleTrialExpiryRecheckIfNeeded()
                 }
                 // Re-arm the disclosure countdown for this foreground board session.
                 scheduleConsentCardIfNeeded()
             }
         case .failed(let failure):
-            StowerFailureView(failure: failure, onRetry: { model.checkAgain() })
+            StowerFailureView(failure: failure, onRetry: { startupModel.checkAgain() })
         }
     }
 
@@ -358,7 +375,7 @@ public struct StowerRootView: View {
         StowerMessagesAccessOnboardingView(
             stillMissing: stillMissing,
             onPresentPicker: { presentMessagesAccessPicker() },
-            onCheckAgain: { model.checkAgain() },
+            onCheckAgain: { startupModel.checkAgain() },
             onQuit: { NSApplication.shared.terminate(nil) }
         )
     }
@@ -379,7 +396,7 @@ public struct StowerRootView: View {
                 return
             }
             messagesAccessBookmarkStore.write(bookmark)
-            model.checkAgain()
+            startupModel.checkAgain()
         } catch {
             pickerErrorMessage = error.localizedDescription
         }
