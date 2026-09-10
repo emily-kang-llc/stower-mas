@@ -19,7 +19,8 @@ anti-corruption boundary that maps engine types to app-owned `StowerStartup*` /
 board adapter, so the reader, verdict cache, and refresh coalescing are shared.
 
 The **Application Window** is the runtime `NSWindow` realized from
-`ApplicationDefinition.applicationWindowScene`'s `WindowGroup`; the term names the
+`ApplicationDefinition.applicationWindowScene`'s single-instance `Window` scene; the
+term names the
 window's product role, not a single-instance cardinality guarantee. Its changing
 content is `StowerApplicationWindowContentView`, which selects one `currentScreen`
 per `StowerStartupState`.
@@ -29,7 +30,7 @@ per `StowerStartupState`.
 ```mermaid
 flowchart TB
     subgraph app["StowerMac (app target) · StowerMacMAS/StowerApplication.swift"]
-        main["@main ApplicationDefinition\napplicationWindowScene → WindowGroup { ApplicationWindowContentConstructionView }"]
+        main["@main ApplicationDefinition\napplicationWindowScene → Window(ApplicationWindowContentConstructionView)"]
     end
 
     subgraph views["StowerMacUI · Views/StowerApplicationWindowContentView.swift"]

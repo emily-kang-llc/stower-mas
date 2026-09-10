@@ -13,6 +13,37 @@ accurate at the time.
 
 ## Status
 
+- 2026-09-10: **Window-menu reopen + save-and-quit on Application-Window close complete
+  (`add-window-menu-to-reopen-main-application-window` — the App Review rejection remedy;
+  code landed 2026-08-24, runtime-verified and locked today).** The Application Window scene
+  is now a single-instance `Window(_:id:)` (`StowerMac/StowerMacMAS/StowerApplication.swift`,
+  scene id `stower.window.main`); `ApplicationLifecycleDelegate` declares
+  `applicationShouldTerminateAfterLastWindowClosed → true` plus a
+  `NSWindow.willCloseNotification` observer covering the Settings-open case; both routes
+  converge on the existing `applicationShouldTerminate` → `StowerTerminationDrain` drain.
+  The drain's registered closure now captures the board model **strongly**
+  (`StowerApplicationWindowContentView`) — a weak capture hollowed the drain once the window
+  closed first — proven by `StowerApplicationWindowContentViewDrainTests`
+  (I-DrainOutlivesWindow) and `StowerBoardViewModelDrainTests`. The quit *rules* live in the
+  testable `StowerAppLifecycle` (StowerMacUI, I-QuitPolicyTested); the delegate is thin
+  wiring. Phase 2 fired: a `Window(_:id:)` scene does NOT auto-populate the Window menu
+  (Apple's `CommandGroupPlacement` docs describe `.singleWindowList` as a placement for
+  commands the app adds) — `ApplicationWindowReopenCommand`
+  (`CommandGroup(after: .singleWindowList)`, `openWindow(id:)`) provides the required "Stower"
+  entry. Runtime behavior observed by hand (checklist in the task's structure outline): menu
+  entry present exactly once and orders the window front; close quits (also with Settings
+  open; closing Settings alone never quits); minimize never quits and every Dock/Window-menu
+  restore path works ("minimize into application icon" included); ⌘Tab after
+  minimize-into-icon activates without restoring — known SwiftUI platform gap, accepted,
+  Window › Stower is the way back; draft round-trips a quit/relaunch; unsubmitted feedback
+  text dies with the process by design. Locked by new precheck guards `6f` (scene type +
+  group-scene absence + both quit mechanisms) and `6g` (drain capture stays strong);
+  `Docs/MacAppContract.md` §10 rewritten to the as-built behavior with the manual checklist;
+  `Docs/how-stower-quits.md` and `ARCHITECTURE.md` swept to the `Window` scene. Runtime
+  finding routed OUT of this branch to issue #25: the MAS build's feedback email reports
+  `License status: paid` with a non-nil instance ID — licensing machinery still compiled in
+  (JC5 of the MAS-purge plan says it must be nil/unlicensed).
+
 - 2026-08-24: **Direct-distribution machinery deleted (MAS-only decision sweep,
   `tmp/decisions/delete-direct-distribution-machinery.md`).** Emily confirmed no
   direct-distribution sibling checkout is active and ruled the retired pipeline
@@ -39,7 +70,7 @@ accurate at the time.
   method to `drainPendingWork()`; the construction-result state, startup-model
   property, and current-Screen property to `applicationWindowContentResult`,
   `startupModel`, and `currentScreen`; and the internal draft-write handle to
-  `DraftWriteTaskHandle` — no runtime behavior, `WindowGroup` shape, construction
+  `DraftWriteTaskHandle` — no runtime behavior, group-scene shape, construction
   frequency, or drain/enqueue ordering changed; prior symbol names remain in Git
   history. `applicationWindowScene` and `settingsScene` are now exact, greppable
   computed `Scene` properties. Added `StowerTerminationDrainTests.swift` (five
