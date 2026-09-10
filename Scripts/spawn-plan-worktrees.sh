@@ -6,7 +6,7 @@
 # built and shipped independently (one branch = one shippable unit, so
 # /ship-with-codex never reviews a moving, multi-plan diff).
 #
-# This is the CREATE half. It composes with scripts/new-worktree.sh (the
+# This is the CREATE half. It composes with scripts/set-up-worktree.sh (the
 # per-worktree env/vault bootstrap), which it runs inside each new worktree.
 #
 # Usage:
@@ -131,10 +131,10 @@ for job in "${JOBS[@]}"; do
   # Per-worktree env/vault bootstrap, if this repo has it. Capture output to a
   # log instead of /dev/null so a failure leaves the actual error on disk —
   # the warning alone can't tell you WHY it failed.
-  if [[ -f "$wt/scripts/new-worktree.sh" ]]; then
-    ( cd "$wt" && bash scripts/new-worktree.sh ) > "$wt/.bootstrap.log" 2>&1 \
+  if [[ -f "$wt/scripts/set-up-worktree.sh" ]]; then
+    ( cd "$wt" && bash scripts/set-up-worktree.sh ) > "$wt/.bootstrap.log" 2>&1 \
       && echo "  bootstrapped .env.local (vault-scoped)" \
-      || echo "  ⚠ new-worktree.sh failed — see $wt/.bootstrap.log (or run it manually in $wt)"
+      || echo "  ⚠ set-up-worktree.sh failed — see $wt/.bootstrap.log (or run it manually in $wt)"
   fi
 
   if [[ $DO_INSTALL -eq 1 && -f "$wt/package.json" ]]; then

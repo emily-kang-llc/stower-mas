@@ -8,7 +8,7 @@
 #   - "npm install"   -> swift package resolve    (fetch deps pinned in Package.resolved)
 #   - "husky install" -> Scripts/install-hooks.sh  (wire precheck.sh to pre-commit)
 #
-# Usage:  ./Scripts/new-worktree.sh
+# Usage:  ./Scripts/set-up-worktree.sh
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 

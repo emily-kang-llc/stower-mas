@@ -17,6 +17,16 @@ cd "$(git rev-parse --show-toplevel)"
 # by hand and fails only as a pre-commit hook — the worst possible split.
 unset SDKROOT CPATH LIBRARY_PATH
 
+# Step 0b — same disease, git's own env vars. A pre-commit hook runs with
+# GIT_QUARANTINE_PATH/GIT_DIR/GIT_INDEX_FILE exported, and git forbids ANY
+# child git process from writing refs while a quarantine is active. SwiftPM's
+# package resolution (git clone --mirror for third-party deps) trips that rule,
+# so a cold worktree's first hook run dies with a bogus "no versions of
+# <package> match the requirement …". Unsetting restores the terminal
+# environment; precheck's own git usage (rev-parse at line 8) re-discovers the
+# repo from cwd. The gate itself is unaffected — exit code still blocks.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_QUARANTINE_PATH
+
 # Step 1 — swift-format. FAILS if absent.
 if command -v swift-format >/dev/null 2>&1; then
     SWIFT_FORMAT=swift-format

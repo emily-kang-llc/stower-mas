@@ -13,6 +13,7 @@ accurate at the time.
 
 ## Status
 
+- 2026-09-10: **`change-script` — renamed `Scripts/new-worktree.sh` → `set-up-worktree.sh` (stale refs swept) and fixed the pre-commit gate: `precheck.sh` now unsets git-injected `GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_QUARANTINE_PATH` so SwiftPM's cold package fetch survives the hook's quarantine env (same disease as the SDKROOT fix, 51f3549). Verified under hook env + cold cache: gate exits 0.**
 - 2026-09-10: **Window-menu reopen + save-and-quit on Application-Window close complete
   (`add-window-menu-to-reopen-main-application-window` — the App Review rejection remedy;
   code landed 2026-08-24, runtime-verified and locked today).** The Application Window scene
