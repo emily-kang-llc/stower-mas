@@ -24,15 +24,18 @@ struct ApplicationDefinition: App {
     private let undoManager = UndoManager()
 
     /// The single Application Window's scene identifier. A single-instance
-    /// `Window` scene (never the multi-instance group scene type) is what puts
-    /// "Stower" in the Window menu's `.singleWindowList` group and what makes the
-    /// app quit when its last window closes — the App Review fix; see
-    /// Docs/MacAppContract.md §10. `fileprivate` (not `private`) because
-    /// `ApplicationLifecycleDelegate` — a different type in this file — needs it
-    /// to recognize the closing window.
+    /// `Window` scene (never the multi-instance group scene type) is what makes
+    /// the app quit when its last window closes — the App Review fix; see
+    /// Docs/MacAppContract.md §10. The Window-menu reopen entry does NOT come
+    /// from the scene type: A1 was refuted at runtime 2026-08-31 (reconfirmed
+    /// 2026-09-10) — SwiftUI does not auto-populate `.singleWindowList`; the
+    /// explicit command in `ApplicationWindowReopenCommand` provides it.
+    /// `fileprivate` (not `private`) because `ApplicationLifecycleDelegate` —
+    /// a different type in this file — needs it to recognize the closing window.
     fileprivate static let applicationWindowSceneID = "stower.window.main"
 
-    /// Both the window title and the `.singleWindowList` menu-item label.
+    /// The window title and the reopen command's Window-menu label (JC7): one
+    /// literal for both.
     fileprivate static let applicationWindowTitle = "Stower"
 
     var body: some Scene {
@@ -54,6 +57,9 @@ struct ApplicationDefinition: App {
                     .keyboardShortcut("z", modifiers: .command)
                 Button("Redo") { performRedo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
+            }
+            CommandGroup(after: .singleWindowList) {
+                ApplicationWindowReopenCommand()
             }
         }
     }
@@ -82,6 +88,25 @@ struct ApplicationDefinition: App {
     /// The standard first-responder Edit-menu undo/redo actions (`undo:` / `redo:`).
     private static let undoActionSelector = Selector(("undo:"))
     private static let redoActionSelector = Selector(("redo:"))
+}
+
+/// The Window-menu reopen item the App Review rejection requires: the menu gave
+/// no way back to the Application Window. A1 was refuted at runtime 2026-08-31
+/// (reconfirmed 2026-09-10) — Apple's `CommandGroupPlacement` docs define
+/// `.singleWindowList` as a placement for commands that "describe and reveal any
+/// windows that the app defines", not an auto-populated list — so the app adds
+/// the command itself. `openWindow(id:)` on a `Window` scene orders that window
+/// to the front (`OpenWindowAction` docs), which is the reveal; with the window
+/// already frontmost or merely unfocused, the same call is a harmless
+/// order-front.
+private struct ApplicationWindowReopenCommand: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button(ApplicationDefinition.applicationWindowTitle) {
+            openWindow(id: ApplicationDefinition.applicationWindowSceneID)
+        }
+    }
 }
 
 /// The app delegate: drains in-flight draft writes on quit so a graceful Cmd-Q
