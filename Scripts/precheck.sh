@@ -118,4 +118,142 @@ if grep -RInE --include="*.swift" \
     exit 1
 fi
 
+# 6e — No stale pre-rename Stower application/window/lifecycle vocabulary remains
+# (2026-08-23 migration to ApplicationDefinition / StowerApplicationWindowContentView
+# / StowerTerminationDrain; the retired declaration/filename literals are named only
+# inside the split fragments below, never spelled out contiguously in a comment).
+# WHY: this vocabulary blurred the application definition, scene description, the
+# runtime Application Window, the construction boundary, and cross-cutting
+# drain/composition language; letting it back in re-teaches the ambiguity the
+# rename removed. Exact stale literals below are split across adjacent quoted
+# fragments so this guard's own source is not itself a false hit when the exact
+# literal is searched for repo-wide.
+
+# 6e-1 — old pre-rename filenames must be gone.
+STALE_OLD_FILES=(
+    "StowerMac/StowerMacMAS/StowerMac""MASApp.swift"
+    "Sources/StowerMacUI/Views/Stower""RootView.swift"
+    "Sources/StowerMacUI/Views/Stower""RootViewLicensing.swift"
+    "Sources/StowerMacUI/Views/StowerTermination""Flusher.swift"
+)
+for STALE_FILE in "${STALE_OLD_FILES[@]}"; do
+    if [ -e "$STALE_FILE" ]; then
+        echo "ERROR: stale pre-rename file present: $STALE_FILE" >&2
+        echo "       It was replaced by StowerApplication.swift /" >&2
+        echo "       StowerApplicationWindowContentView(Licensing).swift / StowerTerminationDrain.swift." >&2
+        echo "       Delete it and migrate any remaining content into the renamed file." >&2
+        exit 1
+    fi
+done
+
+# 6e-2 — exact stale declaration/reference symbols must be absent repo-wide
+# (excluding *.html, the sole permitted historical-record surface per JC1).
+STALE_SYMBOL_PARTS=(
+    "StowerMac""MASApp"
+    "StowerMac""App(\\.swift)?"
+    "StowerApp""Delegate"
+    "StowerMacMAS""Container"
+    "Stower""RootContainer"
+    "Stower""RootView"
+    "StowerTermination""Flusher"
+    "on""Flush"
+    "flush""PendingWork"
+    "flush""All"
+    "Stower""Draft""WriteHandle"
+)
+STALE_SYMBOLS="$(IFS='|'; echo "${STALE_SYMBOL_PARTS[*]}")"
+if git grep -n -E "$STALE_SYMBOLS" -- ':!*.html' 2>/dev/null; then
+    echo "ERROR: stale pre-rename declaration/reference symbol found above." >&2
+    echo "       Migrate it to the aligned target name; no compatibility alias is allowed." >&2
+    exit 1
+fi
+
+# 6e-3 — lowercase 'appDelegate' property reference must be gone from the MAS
+# app entry (renamed to 'applicationLifecycleDelegate').
+STALE_LOWER_APP_DELEGATE="app""Delegate"
+if git grep -n "$STALE_LOWER_APP_DELEGATE" -- StowerMac/StowerMacMAS 2>/dev/null; then
+    echo "ERROR: stale 'appDelegate' property reference found above in StowerMac/StowerMacMAS." >&2
+    echo "       Rename it to 'applicationLifecycleDelegate'." >&2
+    exit 1
+fi
+
+# 6e-4 — unambiguous stale multi-word phrases must be absent from tracked active
+# context. Character classes replace literal spaces so this guard's own source
+# text never spells the banned phrase contiguously.
+STALE_PHRASES='composition[[:space:]]root'
+STALE_PHRASES="$STALE_PHRASES|composition[[:space:]]point"
+STALE_PHRASES="$STALE_PHRASES|termination[[:space:]]flush"
+STALE_PHRASES="$STALE_PHRASES|flush[[:space:]]on[[:space:]]quit"
+STALE_PHRASES="$STALE_PHRASES|save[[:space:]]on[[:space:]]quit"
+STALE_PHRASES="$STALE_PHRASES|main[[:space:]]window"
+STALE_PHRASES="$STALE_PHRASES|board[[:space:]]window"
+STALE_PHRASES="$STALE_PHRASES|top-level[[:space:]]declaration"
+if git grep -n -i -E "$STALE_PHRASES" -- \
+    .github AGENTS.md ARCHITECTURE.md Docs Sources Tests StowerMac Scripts 2>/dev/null; then
+    echo "ERROR: stale application/window/lifecycle phrase found above." >&2
+    echo "       Rewrite it using the exact aligned relationship (see AGENTS.md" >&2
+    echo "       'Naming map' and Docs/MacAppContract.md) instead of the retired phrase." >&2
+    exit 1
+fi
+
+# 6f — the MAS app must stay single-window and quit-on-close (I-SingleWindow).
+# WHY: a multi-window group scene or a missing quit hook leaves the process running
+# with no window and no way back — the exact App Review rejection
+# ("no menu item to re-open the Application Window") this guard exists to prevent
+# recurring. Four assertions; a menu is invisible to tests and greps cannot see one,
+# so the guard asserts the SOURCE that produces the observed behavior
+# (verified 2026-08-24/2026-09-10 by the Phase 1 manual checklist).
+
+# 6f-1 — the Application Window scene must be declared with the single-instance
+# scene type. Anchored to a real scene declaration line (leading whitespace then
+# `Window(`), so a comment mentioning the type never satisfies it.
+if ! git grep -qE '^[[:space:]]*Window\(' -- StowerMac/StowerMacMAS 2>/dev/null; then
+    echo "ERROR: no single-instance scene declaration found in StowerMac/StowerMacMAS." >&2
+    echo "       The Application Window must be declared 'Window(_:id:)', never a" >&2
+    echo "       multi-window group scene — otherwise the app can run windowless with" >&2
+    echo "       no way back, the App Review rejection." >&2
+    exit 1
+fi
+
+# 6f-2 — the multi-window group scene type must be absent from the MAS app target.
+if git grep -nE 'Window''Group' -- StowerMac/StowerMacMAS 2>/dev/null; then
+    echo "ERROR: multi-window group scene type found above in StowerMac/StowerMacMAS." >&2
+    echo "       Stower is a single-window app: restore 'Window(_:id:)' — a group scene" >&2
+    echo "        lets the app run windowless with no way back, the App Review rejection." >&2
+    exit 1
+fi
+
+# 6f-3 — the declared quit-after-last-close policy must remain on the delegate.
+if ! git grep -q 'applicationShouldTerminateAfterLastWindowClosed' -- StowerMac/StowerMacMAS 2>/dev/null; then
+    echo "ERROR: applicationShouldTerminateAfterLastWindowClosed not declared in" >&2
+    echo "       StowerMac/StowerMacMAS. The save-and-quit policy must be stated in" >&2
+    echo "       source, not left to a scene type's implicit semantics — without it a" >&2
+    echo "       window close can strand the process running windowless with no way" >&2
+    echo "       back, the App Review rejection." >&2
+    exit 1
+fi
+
+# 6f-4 — the Application-Window close observer must remain (the Settings-open case).
+if ! git grep -q 'willCloseNotification' -- StowerMac/StowerMacMAS 2>/dev/null; then
+    echo "ERROR: willCloseNotification observer not found in StowerMac/StowerMacMAS." >&2
+    echo "       Without it, quitting via an Application-Window close while Settings is" >&2
+    echo "       open leaves the process running with no Application Window and no way" >&2
+    echo "       back, the App Review rejection." >&2
+    exit 1
+fi
+
+# 6g — the termination drain must hold the board model STRONGLY
+# (I-DrainWiredStrongly). WHY: a weak capture hollows the quit drain once the
+# window closes first — the process exits mid-write with no symptom; a drain that
+# ran and a drain that never happened look identical from outside. Proven by
+# StowerApplicationWindowContentViewDrainTests (I-DrainOutlivesWindow); this guard
+# keeps the source honest between runs.
+if git grep -nE 'registerDrain.*\[weak' -- \
+    Sources/StowerMacUI/Views/StowerApplicationWindowContentView.swift 2>/dev/null; then
+    echo "ERROR: registerDrain captures its target weakly (see line above)." >&2
+    echo "       The drain closure must capture the board model strongly — a weak" >&2
+    echo "       capture hollows the quit drain once the window closes first." >&2
+    exit 1
+fi
+
 echo "All checks passed."

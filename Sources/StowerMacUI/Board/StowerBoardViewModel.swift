@@ -206,10 +206,10 @@ internal final class StowerBoardViewModel {
     internal static let coalesceRetryDelay: Duration = .milliseconds(400)
 
     /// In-flight write-through upserts, per key, chained in issue order so the last
-    /// edit wins. Deliberately OUT of `cancel()`'s reach so the termination flush can
+    /// edit wins. Deliberately OUT of `cancel()`'s reach so `StowerTerminationDrain` can
     /// still drain them (JC2). Cleared once a key's write finishes, so `mergeDrafts`'s
     /// I10 guard reflects a write genuinely still in flight, not "one ran once."
-    internal var inflightWrites: [String: StowerDraftWriteHandle] = [:]
+    internal var inflightWrites: [String: DraftWriteTaskHandle] = [:]
 
     /// Monotonic id for the draining-bar slot, bumped on each replace so the
     /// `StowerDismissUndoBar` view restarts its drain timer (`.task(id:)`) when the

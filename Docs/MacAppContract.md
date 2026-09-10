@@ -406,21 +406,65 @@ same shape — never let a view model import `StowerMessages`.
 
 ---
 
-## 10. App scenes & lifecycle hooks (`StowerMacApp`)
+## 10. App scenes & lifecycle hooks (`ApplicationDefinition`)
 
-`StowerMacApp` declares **two scenes**:
+`ApplicationDefinition` declares **two scenes**, each a private computed `some Scene`:
 
-- `WindowGroup { StowerRootContainer(...) }` — the main window; `.commands` (the
-  ⌘Z / ⌘⇧Z undo bridge) stays on this scene.
-- `Settings { StowerSettingsView() }` — the standard macOS Preferences scene.
+- `applicationWindowScene`: `Window(ApplicationDefinition.applicationWindowTitle,
+  id: ApplicationDefinition.applicationWindowSceneID) {
+  ApplicationWindowContentConstructionView(...) }` — the single-instance Application Window
+  (title and Window-menu label "Stower"; scene id `stower.window.main`); `.commands`
+  (the ⌘Z / ⌘⇧Z undo bridge, plus `ApplicationWindowReopenCommand` — the Window-menu
+  "Stower" item, `CommandGroup(after: .singleWindowList)`) stays on this scene.
+- `settingsScene`: `Settings { StowerSettingsView() }` — the standard macOS Preferences scene.
   `StowerSettingsView` is a `TabView` whose only pane today is
   `StowerPrivacySettingsView` (analytics consent toggle).
 
-**Launch/quit diagnostics hooks** (the only lifecycle calls the app makes into the
-diagnostics subsystem — see [Analytics.md](Analytics.md) and
-[CrashReporting.md](CrashReporting.md) for the full rationale):
+**Save-and-quit when the Application Window closes — the App Review remedy.** Closing the
+Application Window quits the app, always — including when the `Settings` scene's window is
+still open (Settings is also an `NSWindow`, so that close is *not* a last-window close; the
+App Review rejection was a windowless Stower running with no menu item to bring it back).
+Three mechanisms implement it, deliberately redundant, and every one of them converges on the
+single drain path (`applicationShouldTerminate` →
+`StowerTerminationDrain.drainPendingWork()` → `StowerBoardViewModel.drainPendingWork()`), so
+the process cannot exit while a draft write is still landing:
 
-- `StowerMacApp.init` → `StowerDiagnostics.initialize()` then
+1. the single-instance `Window` scene itself — AppKit initiates termination when its only
+   window closes;
+2. `ApplicationLifecycleDelegate.applicationShouldTerminateAfterLastWindowClosed → true` —
+   the policy stated in Stower's own source (`StowerAppLifecycle.quitsAfterLastWindowClosed`,
+   unit-tested per I-QuitPolicyTested), not left to a scene type's implicit semantics;
+3. the `NSWindow.willCloseNotification` observer on the same delegate, which recognizes the
+   Application Window by its scene id (`StowerAppLifecycle.shouldQuit(onCloseOf:)`) and calls
+   `NSApp.terminate(nil)` — the only route that covers the Settings-open case.
+
+The Window-menu reopen item satisfies the rejection's other branch: the menu names the
+Application Window, and selecting it orders the window front (`openWindow(id:)`) when it is
+behind or minimized. There is no windowless-but-running state: a closed Application Window
+means a terminated process. The behavior is locked by precheck guards `6f` (scene type,
+group-scene absence, both quit mechanisms present) and `6g` (the drain capture stays
+strong).
+
+Manual checklist — re-run by hand after any change to these paths; runtime-observed
+2026-08-24 and 2026-09-10:
+
+- [ ] Window menu lists exactly one "Stower" item; selecting it orders the board front
+- [ ] Closing the Application Window (red button or ⌘W) quits; `pgrep -x Stower` finds nothing
+- [ ] With Settings open, closing the Application Window closes Settings and quits; closing
+      Settings alone leaves Stower running
+- [ ] Minimize never quits: the Dock icon, Window › Stower, and — with "Minimize windows
+      into application icon" enabled — a Dock click still restore the window (⌘Tab activates
+      the app without restoring: known SwiftUI platform gap, accepted; Window › Stower is the
+      way back)
+- [ ] A draft typed before quit reattaches after relaunch
+- [ ] Unsubmitted feedback text dies with the process (memory-only by design, A10)
+
+**Launch/quit diagnostics hooks** (the only lifecycle calls the app makes into the
+diagnostics subsystem — the event schema and PII rules live in
+`StowerAnalyticsEvent`'s doc comments; crash reporting's absence is recorded in
+[CrashReporting.md](CrashReporting.md)):
+
+- `ApplicationDefinition.init` → `StowerDiagnostics.initialize()` then
   `StowerAnalytics.reportAppLaunched()`. On the MAS target, `initialize()` starts
   only the analytics backend (consent-gated, no-op reporter — no TelemetryDeck SDK
   is available). Crash reporting (Sentry) is absent.
@@ -428,9 +472,9 @@ diagnostics subsystem — see [Analytics.md](Analytics.md) and
   The public `StowerDiagnostics.initialize()` signature is the same as the non-MAS
   target, but internally Sentry crash reporting is never started — see
   `Docs/CrashReporting.md` for the rationale.
-- `StowerAppDelegate.applicationShouldTerminate` → `StowerAnalytics.reportSessionEnded()`
-  **synchronously**, BEFORE draining draft writes. The quit path never `await`s
-  analytics; the no-op reporter drops the event instantly.
+- `ApplicationLifecycleDelegate.applicationShouldTerminate` → `StowerAnalytics.reportSessionEnded()`
+  **synchronously**, BEFORE draining draft writes via `StowerTerminationDrain.drainPendingWork()`.
+  The quit path never `await`s analytics; the no-op reporter drops the event instantly.
 
 The analytics subsystem (`Sources/StowerMacUI/Analytics/`) is **app-internal**, not
 engine-backed — it sits above the §9 adapter wall and imports no engine module.

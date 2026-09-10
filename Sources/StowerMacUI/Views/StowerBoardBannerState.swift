@@ -1,3 +1,7 @@
+// WILL BE REMOVED, IGNORE — inactive Lemon Squeezy licensing/trial subsystem. The MAS
+// build wires no license gate, so nothing in this file is reachable at runtime. Removal
+// is a planned separate concern (Docs/BuildLog.md, 2026-08-24 entry).
+
 import Foundation
 
 /// The board's one dismissible bottom-banner slot, driven by license/trial
@@ -48,7 +52,8 @@ internal enum StowerBoardBannerState: Sendable, Equatable {
 
     /// F3 threshold: one day or less of trial remaining (highest intent, least nag).
     ///
-    /// `internal` (not `private`) so `StowerRootView.scheduleTrialExpiryRecheckIfNeeded`
+    /// `internal` (not `private`) so
+    /// `StowerApplicationWindowContentView.scheduleTrialExpiryRecheckIfNeeded`
     /// can schedule a re-render at this same threshold — the single source of truth
     /// for "how soon before expiry does F3 start" lives here, not duplicated there.
     internal static let buyNudgeThresholdDays: Double = 1

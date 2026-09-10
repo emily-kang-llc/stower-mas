@@ -120,7 +120,7 @@ code:
 
 ## Conventions
 
-- All public top-level declarations in a `Stower*` module must begin with
+- All public file-scope declarations in a `Stower*` module must begin with
   `Stower`, or be nested inside a type that does. Underscore-prefixed names
   are treated as internal API even if `public`.
 - Tests go in `Tests/<ModuleName>Tests/`. One file per type under test.
@@ -142,8 +142,8 @@ code:
      `StowerMac` scheme, `StowerMac.xcodeproj`, and the `StowerMacUI` /
      `StowerCore` / `StowerMessages` / `StowerPhotos` SPM module names. Do
      **not** sweep `StowerMac → Stower` anywhere in scheme/project/module
-     names — it breaks `-scheme StowerMac` in `ci.yml` + `release.yml`, every
-     `import StowerMacUI`, and `precheck.sh`'s own path guards.
+     names — it breaks `-scheme StowerMacMAS` in `ci.yml` + `mas-release.yml`,
+     every `import StowerMacUI`, and `precheck.sh`'s own path guards.
   2. **Within product identity, `PRODUCT_NAME` and the display name are
      deliberately different values — do not unify them.** `PRODUCT_NAME` stays
      space-free (`StowerTest` / `Stower`) because it drives the `.app` filename,
@@ -179,3 +179,26 @@ commit.) Order matters — noticing comes before fixing:
 Do not add a new convention rule by hand — route it through `harden-guardrail` so it
 lands as a gate first, an `AGENTS.md` rule only when it can't be mechanized, and gets
 recorded in the catalog.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`emily-kang-llc/stower-mas`), via the `gh` CLI. See
+`Docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name; `wontfix` already exists in
+the repo, the other four need creating. See `Docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the repo root (hand-edited — agents read it, never write it),
+with `Docs/adr/` reserved for ADRs. See `Docs/agents/domain.md`.
+
+### Codebase language alignment
+
+Global, not here: `~/.agents/skills/align-codebase-language` reads the personal map
+pointer in ignored `.agents/align-codebase-language.local.md`. Source and this repo's
+own docs win over that map; `CONTEXT.md` stays hand-edited.
