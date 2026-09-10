@@ -3,7 +3,7 @@
   "pathTemplate": "~/worktrees/{{ REPOBASENAME }}/{{ TASKSLUG }}",
   "branchTemplate": "{{ TASKSLUG }}",
   "sourceRef": "HEAD",
-  "setupCommand": "./Scripts/new-worktree.sh",
+  "setupCommand": "./Scripts/set-up-worktree.sh",
   "copyGlobs": [
     ".env.keys",
     ".claude/settings.local.json",
