@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.0.0"),
-        .package(url: "https://github.com/mattt/Madrid", exact: "0.4.0"),
+        .package(url: "https://github.com/mattt/Madrid", exact: "0.5.0"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.3.0"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.3.0"),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "0.1.17"),
